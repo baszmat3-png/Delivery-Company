@@ -97,8 +97,8 @@ function api(req,res,a,qs){return body(req).then(async b=>{const m=req.method;
   if(need&&p4.length<4)return out(res,200,{co,phone:true,need:true});
   const L=((db.state||{}).orders||[]).filter(o=>!o.deleted&&String(o.no)==no&&(!need||String(o.phone||'').replace(/\D/g,'').slice(-4)==p4));
   const o=L[L.length-1];if(!o)return out(res,404,{error:'لم يتم العثور على طلب بهذه البيانات'});
-  const rep=users().find(u=>u.id==o.rep);
-  return out(res,200,{ok:true,co,no:o.no,date:o.date,status:o.status,gov:o.gov,area:o.area,cust:String(o.cust||'').split(' ')[0],rep:rep?{name:rep.name,phone:rep.phone||''}:null,hist:(o.hist||[]).map(h=>({s:h.s,t:h.t}))})}
+  const rep=users().find(u=>u.id==o.rep),full=p4.length==4&&String(o.phone||'').replace(/\D/g,'').slice(-4)==p4;
+  return out(res,200,{ok:true,co,no:o.no,date:o.date,status:o.status,gov:o.gov,area:o.area,cust:String(o.cust||'').split(' ')[0],full:full?{cust:o.cust||'',phone:o.phone||'',goods:o.goods||'',qty:o.qty||1,total:+o.total||0,notes:o.notes||'',client:(users().find(u=>u.id==o.client)||{}).name||''}:null,rep:rep?{name:rep.name,phone:rep.phone||''}:null,hist:(o.hist||[]).map(h=>({s:h.s,t:h.t}))})}
  const tk=verify(req.headers['x-token']),me=tk&&find(tk.id);if(!me||!+me.active)return out(res,401,{error:'unauthorized'});
  const staff=STAFF.includes(me.type),mgr=me.type=='مدير';
  if(a=='state'&&m=='GET')return staff?out(res,200,{state:db.state}):out(res,403,{error:'forbidden'});

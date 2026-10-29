@@ -9,6 +9,12 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
+import android.print.PrintAttributes;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintManager;
+import android.webkit.JavascriptInterface;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -25,6 +31,30 @@ public class MainActivity extends Activity {
     private View splash;
     private final Handler h = new Handler(Looper.getMainLooper());
     private boolean ready = false;
+    private ValueCallback<Uri[]> filePathCb;
+    private WebView printView;
+
+    /** جسر الطباعة: يستدعيه الموقع بـ AndroidPrint.printHtml(html, widthMm) */
+    public class PrintBridge {
+        @JavascriptInterface
+        public void printHtml(final String html, final int widthMm) {
+            runOnUiThread(() -> {
+                printView = new WebView(MainActivity.this);
+                printView.setWebViewClient(new WebViewClient() {
+                    @Override public void onPageFinished(WebView v, String url) {
+                        PrintManager pm = (PrintManager) getSystemService(PRINT_SERVICE);
+                        PrintDocumentAdapter ad = v.createPrintDocumentAdapter("UFQ-Receipt");
+                        int mils = Math.round(widthMm / 25.4f * 1000f);
+                        PrintAttributes.Builder b = new PrintAttributes.Builder()
+                                .setMediaSize(new PrintAttributes.MediaSize("receipt" + widthMm, "Receipt " + widthMm + "mm", mils, 11000))
+                                .setMinMargins(PrintAttributes.Margins.NO_MARGINS);
+                        pm.print("UFQ-Receipt", ad, b.build());
+                    }
+                });
+                printView.loadDataWithBaseURL(BuildConfig.APP_URL, html, "text/html", "utf-8", null);
+            });
+        }
+    }
 
     private int dp(int v) { return (int) (v * getResources().getDisplayMetrics().density); }
 
@@ -63,6 +93,23 @@ public class MainActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
+        web.addJavascriptInterface(new PrintBridge(), "AndroidPrint");
+        // اختيار الملفات (استيراد Excel) — لا يعمل داخل WebView بدون هذا
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView v, ValueCallback<Uri[]> cb, FileChooserParams p) {
+                if (filePathCb != null) filePathCb.onReceiveValue(null);
+                filePathCb = cb;
+                try {
+                    startActivityForResult(p.createIntent(), 77);
+                } catch (Exception e) { filePathCb = null; return false; }
+                return true;
+            }
+        });
+        // تنزيل الملفات (قالب Excel...) عبر المتصفح
+        web.setDownloadListener((url, ua, cd, mime, len) -> {
+            try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); } catch (Exception ignored) {}
+        });
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
@@ -99,6 +146,13 @@ public class MainActivity extends Activity {
     private void retry() {
         splash.setVisibility(View.VISIBLE);
         h.postDelayed(() -> { if (!ready) web.loadUrl(BuildConfig.APP_URL); }, 4000);
+    }
+
+    @Override protected void onActivityResult(int req, int res, Intent data) {
+        if (req == 77 && filePathCb != null) {
+            filePathCb.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(res, data));
+            filePathCb = null;
+        } else super.onActivityResult(req, res, data);
     }
 
     @Override protected void onSaveInstanceState(Bundle o) { super.onSaveInstanceState(o); web.saveState(o); }
