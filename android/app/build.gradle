@@ -1,0 +1,22 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.ufq.panel'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'com.ufq.panel'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+        // رابط الموقع — غيّره اذا تغيّر الرابط
+        buildConfigField 'String', 'APP_URL', '"https://ufq-control-panel.onrender.com/"'
+    }
+    buildFeatures { buildConfig true }
+    buildTypes {
+        release { signingConfig signingConfigs.debug }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
