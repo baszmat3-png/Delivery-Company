@@ -1,7 +1,16 @@
 package com.ufq.panel;
 
 import android.app.Activity;
+import android.content.ContentValues;
 import android.content.Intent;
+import android.os.Build;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.util.Base64;
+import android.widget.Toast;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
@@ -36,6 +45,36 @@ public class MainActivity extends Activity {
 
     /** جسر الطباعة: يستدعيه الموقع بـ AndroidPrint.printHtml(html, widthMm) */
     public class PrintBridge {
+        /** حفظ ملف (صورة / PDF) في مجلد التنزيلات: AndroidPrint.saveFile(base64, name, mime) */
+        @JavascriptInterface
+        public void saveFile(final String b64, final String name, final String mime) {
+            String msg;
+            try {
+                byte[] data = Base64.decode(b64, Base64.DEFAULT);
+                if (Build.VERSION.SDK_INT >= 29) {
+                    ContentValues cv = new ContentValues();
+                    cv.put(MediaStore.Downloads.DISPLAY_NAME, name);
+                    cv.put(MediaStore.Downloads.MIME_TYPE, mime);
+                    cv.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+                    Uri u = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv);
+                    OutputStream os = getContentResolver().openOutputStream(u);
+                    os.write(data);
+                    os.close();
+                    msg = "تم الحفظ في مجلد التنزيلات: " + name;
+                } else {
+                    File f = new File(getExternalFilesDir(null), name);
+                    FileOutputStream os = new FileOutputStream(f);
+                    os.write(data);
+                    os.close();
+                    msg = "تم الحفظ: " + f.getAbsolutePath();
+                }
+            } catch (Exception e) {
+                msg = "تعذر حفظ الملف";
+            }
+            final String m = msg;
+            runOnUiThread(() -> Toast.makeText(MainActivity.this, m, Toast.LENGTH_LONG).show());
+        }
+
         @JavascriptInterface
         public void printHtml(final String html, final int widthMm) {
             runOnUiThread(() -> {
