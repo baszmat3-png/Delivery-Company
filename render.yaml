@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: ufq-control-panel
+    runtime: node
+    plan: free
+    buildCommand: echo ok
+    startCommand: node server.js
+    envVars:
+      - key: ADMIN_PASS      # كلمة مرور المدير (user: admin) — تجدها في Environment
+        generateValue: true
+      - key: SECRET
+        generateValue: true
+      # للحفظ الدائم (خطة مدفوعة + Disk على /data) فعّل السطرين:
+      # - key: DB_FILE
+      #   value: /data/data.json
