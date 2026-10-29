@@ -56,6 +56,15 @@ window.voucherHTML=function(v,ps){ps=ps||getPS();const q=v.type=='قبض';
  `<div class="sig"><div>${q?'المسلِّم':'المستلم'}</div><div>المحاسب</div></div><div class="dv"></div><div class="c sm">${now()}</div>`,ps)};
 
 
+
+/* كشف حساب */
+window.statementHTML=function(st,ps){ps=ps||getPS();
+ const rows=st.rows.map(r=>`<tr><td>${esc(r.no)}</td><td>${n(r.total)}</td><td>${n(r.fee)}</td><td>${n(r.net)}</td></tr>`).join('');
+ return wrap(head(st,'كشف حساب',ps)+row('الاسم',st.name)+row('الفترة',st.range)+'<div class="dv"></div>'+
+ `<table style="width:100%;border-collapse:collapse;text-align:center;font-size:inherit"><tr style="font-weight:800;border-bottom:1.5px solid #000"><td>الوصل</td><td>المبلغ</td><td>الاجرة</td><td>الصافي</td></tr>${rows}</table><div class="dv"></div>`+
+ row('عدد الطلبات',st.rows.length)+row('المبلغ الكلي',n(st.T)+' د.ع')+row('الاجور',n(st.F)+' د.ع')+`<div class="tot"><span>الصافي</span><b>${n(st.T-st.F)} د.ع</b></div><div class="dv"></div><div class="c sm">${now()}</div>`,ps)};
+window.printStatement=st=>previewPrint(ps=>statementHTML(st,ps),'كشف حساب','statement');
+
 /* ===== حفظ كصورة / PDF ===== */
 const toDataURL=async u=>{try{const r=await fetch(u),b=await r.blob();return await new Promise(ok=>{const f=new FileReader();f.onload=()=>ok(f.result);f.readAsDataURL(b)})}catch(e){return u}};
 window.htmlToCanvas=async function(html,mm){

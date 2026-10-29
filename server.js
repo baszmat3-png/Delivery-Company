@@ -13,6 +13,7 @@ const WA_EV={
 const waDef=()=>({on:0,provider:'ultramsg',instance:'',token:'',phoneId:'',url:'',method:'POST',headers:'',bodyTpl:'',base:'',auto:'',trackPhone:1,events:{}});
 let db={state:null,auth:{},tg:{token:'',chat:'',on:1},secret:'',wa:null,waLog:[],waSent:{}};
 try{const f=JSON.parse(fs.readFileSync(DB,'utf8'));Object.assign(db,f);db.tg=Object.assign({token:'',chat:'',on:1},f.tg||{})}catch(e){}
+if(db.state&&db.state.co&&/الأ?فق/.test(db.state.co.name||''))db.state.co.name='شركة التراث للتوصيل السريع';
 db.wa=Object.assign(waDef(),db.wa||{});db.waLog=db.waLog||[];db.waSent=db.waSent||{};
 Object.keys(WA_EV).forEach(k=>db.wa.events[k]=Object.assign({on:WA_EV[k].on,text:WA_EV[k].text},db.wa.events[k]||{}));
 const hash=(p,s=crypto.randomBytes(16).toString('hex'))=>s+':'+crypto.scryptSync(String(p),s,32).toString('hex');
@@ -115,13 +116,27 @@ function api(req,res,a,qs){return body(req).then(async b=>{const m=req.method;
     if(+p.status!=+o.status)waStatus(o,+o.status)})}
   touch();return out(res,200,{ok:true})}
  if(a=='portal'&&m=='GET'){const S=db.state||{orders:[],prov:{},co:{}},cl=me.type=='عميل',P=o=>S.prov[o.gov]||[0,0];
-  const ord=S.orders.filter(o=>!o.deleted&&(cl?o.client==me.id:o.rep==me.id)).slice(-300).reverse().map(o=>({id:o.id,no:o.no,date:o.date,cust:o.cust,phone:o.phone,gov:o.gov,area:o.area,goods:o.goods,qty:o.qty,total:o.total,notes:o.notes,status:o.status,fee:(cl?P(o)[0]+(+o.xc||0):P(o)[1]+(+o.xr||0))}));
+  const ord=S.orders.filter(o=>!o.deleted&&(cl?o.client==me.id:o.rep==me.id)).slice(-300).reverse().map(o=>({id:o.id,no:o.no,date:o.date,cust:o.cust,phone:o.phone,gov:o.gov,area:o.area,goods:o.goods,qty:o.qty,total:o.total,notes:o.notes,status:o.status,rep:(u=>u?{name:u.name,phone:u.phone||''}:null)(users().find(u=>u.id==o.rep)),hist:(o.hist||[]).map(h=>({s:h.s,t:h.t})),fee:(cl?P(o)[0]+(+o.xc||0):P(o)[1]+(+o.xr||0))}));
   return out(res,200,{me:{id:me.id,name:me.name,type:me.type,phone:me.phone},co:(S.co||{}).name||'',govs:Object.keys(S.prov||{}),orders:ord})}
  if(a=='order'&&m=='POST'){if(me.type!='عميل'||!db.state)return out(res,403,{error:'غير مسموح'});const S=db.state;
   const o={id:Date.now(),no:esc(b.no,30).trim(),date:td(),client:me.id,rep:0,gov:S.prov[b.gov]?b.gov:(S.co||{}).gov,area:esc(b.area),cust:esc(b.cust).trim(),phone:esc(b.phone,20),goods:esc(b.goods),qty:Math.max(1,+b.qty||1),total:+b.total||0,xc:0,xr:0,notes:esc(b.notes,300),status:0,archived:false,deleted:false};
   if(!o.no||!o.cust||o.total<=0)return out(res,400,{error:'ادخل رقم الوصل واسم الزبون والمبلغ'});
-  if(S.orders.some(x=>x.no==o.no&&x.client==me.id))return out(res,400,{error:'رقم الوصل مكرر'});
+  if(S.orders.some(x=>x.no==o.no&&x.client==me.id&&!x.deleted))return out(res,400,{error:'رقم الوصل مكرر'});
   hist(o,0);S.orders.push(o);waTrigger(o,'new');const t=`🆕 طلب جديد ${o.no} من العميل ${me.name} — ${o.cust} — ${o.gov} — ${(+o.total).toLocaleString('en-US')} د.ع`;S.notes.unshift({d:td(),t});touch();notify('🔔 '+(S.co||{}).name+'\n'+t);return out(res,200,{ok:true})}
+
+ if(a=='obulk'&&m=='POST'){if(me.type!='عميل'||!db.state)return out(res,403,{error:'غير مسموح'});const S=db.state,rows=Array.isArray(b.rows)?b.rows.slice(0,300):[];let add=0;const bad=[];
+  rows.forEach((r,i)=>{const o={id:Date.now()+i,no:esc(r.no,30).trim(),date:td(),client:me.id,rep:0,gov:S.prov[r.gov]?r.gov:(S.co||{}).gov,area:esc(r.area),cust:esc(r.cust).trim(),phone:esc(r.phone,20),goods:esc(r.goods),qty:Math.max(1,+r.qty||1),total:+r.total||0,xc:0,xr:0,notes:esc(r.notes,300),status:0,archived:false,deleted:false};
+   if(!o.no||!o.cust||o.total<=0){bad.push('سطر '+(i+2)+': بيانات ناقصة (رقم الوصل / الزبون / المبلغ)');return}
+   if(S.orders.some(x=>x.no==o.no&&x.client==me.id&&!x.deleted)){bad.push('سطر '+(i+2)+': رقم الوصل '+o.no+' مكرر');return}
+   hist(o,0);S.orders.push(o);add++;waTrigger(o,'new')});
+  if(add){const t='📥 استيراد '+add+' طلب من العميل '+me.name;S.notes.unshift({d:td(),t});touch();notify('🔔 '+(S.co||{}).name+'\n'+t)}
+  return out(res,200,{ok:true,added:add,skipped:bad.length,errors:bad.slice(0,8)})}
+ if(a=='oedit'&&m=='POST'){const o=db.state&&db.state.orders.find(x=>x.id==b.id);if(me.type!='عميل'||!o||o.client!=me.id||o.deleted)return out(res,403,{error:'غير مسموح'});
+  if(o.status!=0)return out(res,400,{error:'لا يمكن تعديل طلب بدأ تنفيذه'});const cust=esc(b.cust).trim(),total=+b.total||0;if(!cust||total<=0)return out(res,400,{error:'ادخل اسم الزبون والمبلغ'});
+  Object.assign(o,{cust,phone:esc(b.phone,20),gov:db.state.prov[b.gov]?b.gov:o.gov,area:esc(b.area),goods:esc(b.goods),qty:Math.max(1,+b.qty||1),total,notes:esc(b.notes,300)});
+  const t='✏️ عدّل العميل '+me.name+' الوصل '+o.no;db.state.notes.unshift({d:td(),t});touch();notify('🔔 '+(db.state.co||{}).name+'\n'+t);return out(res,200,{ok:true})}
+ if(a=='ocancel'&&m=='POST'){const o=db.state&&db.state.orders.find(x=>x.id==b.id);if(me.type!='عميل'||!o||o.client!=me.id||o.deleted)return out(res,403,{error:'غير مسموح'});
+  if(o.status!=0)return out(res,400,{error:'لا يمكن الغاء طلب بدأ تنفيذه'});o.deleted=true;const t='🚫 ألغى العميل '+me.name+' الوصل '+o.no;db.state.notes.unshift({d:td(),t});touch();notify('🔔 '+(db.state.co||{}).name+'\n'+t);return out(res,200,{ok:true})}
  if(a=='ostatus'&&m=='POST'){const o=db.state&&db.state.orders.find(x=>x.id==b.id),s=+b.status;if(!o||!(s>=0&&s<=4))return out(res,400,{error:'طلب غير صالح'});
   if(!staff&&!(me.type=='مندوب'&&o.rep==me.id&&s>0))return out(res,403,{error:'غير مسموح'});
   const prev=o.status;o.status=s;if(prev!=s)waStatus(o,s);const t=`🔄 الوصل ${o.no} : ${ST[s]} (${me.name})`;db.state.notes.unshift({d:td(),t});touch();notify('🔔 '+(db.state.co||{}).name+'\n'+t);return out(res,200,{ok:true})}
