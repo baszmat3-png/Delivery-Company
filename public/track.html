@@ -35,7 +35,7 @@ const ph=p=>{p=String(p||'').replace(/\D/g,'');return p.startsWith('964')?p:p.re
 const fmt=t=>new Date(t).toLocaleString('ar-IQ',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
 let need=false;
 async function q(no,p){const r=await fetch('/api/track?no='+encodeURIComponent(no)+'&p='+encodeURIComponent(p||''));return r.json()}
-async function init(){try{const r=await q('');if(r.co)$('#co').textContent=r.co;need=!!r.phone;$('#pw').style.display=need?'':'none';
+async function init(){try{const r=await q('');if(r.co)$('#co').textContent=/الأ?فق/.test(r.co)?'شركة التراث للتوصيل السريع':r.co;need=!!r.phone;$('#pw').style.display=need?'':'none';
  const u=new URLSearchParams(location.search);if(u.get('no')){$('#no').value=u.get('no');$('#p4').value=(u.get('p')||'').slice(-4);go()}}catch(e){}}
 async function go(){const no=$('#no').value.trim(),p=$('#p4').value.trim();$('#er').innerHTML='';
  if(!no)return $('#er').innerHTML='<div class="err">ادخل رقم الطلب</div>';

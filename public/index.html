@@ -56,13 +56,14 @@ const MODE=()=>localStorage.mode||(location.protocol=='file:'?'demo':'server'),K
 const $=s=>document.querySelector(s),n=x=>(+x||0).toLocaleString('en-US'),td=(d=0)=>new Date(Date.now()-d*864e5).toISOString().slice(0,10);
 const TY=['ادخال','محاسب','مدير','عميل','مندوب','مخزن','Call Center'],ST=['قيد الانتظار','قيد التنفيذ','تم التسليم','مؤجل','راجع'];
 const G0=['كربلاء','بغداد','النجف','بابل','البصرة','نينوى','أربيل','السليمانية','دهوك','كركوك','الأنبار','ديالى','صلاح الدين','واسط','ذي قار','ميسان','المثنى','القادسية'];
+function fixCo(){if(D&&D.co&&/ال[أا]فق/.test(D.co.name||''))D.co.name='شركة التراث للتوصيل السريع'}
 function seed(){const s={seq:100,co:{name:'شركة التراث للتوصيل السريع',gov:'كربلاء'},users:[],orders:[],cash:[],exp:[],notes:[],stmts:[],fixed:{},prov:{}};
 G0.forEach((g,i)=>s.prov[g]=[i?4000+i*250:3000,i?2500+i*100:2000]);
 [['المدير العام','admin','مدير'],['علي المحاسب','acc','محاسب'],['زينب','entry','ادخال'],['مدير الفرع','mgr2','مدير'],['مدير المبيعات','mgr3','مدير'],['متجر النخيل','c1','عميل'],['صيدلية الأمل','c2','عميل'],['معرض الرافدين','c3','عميل'],['مصطفى كربلاء','r1','مندوب'],['حسين بغداد','r2','مندوب'],['كرار النجف','r3','مندوب']].forEach(([name,user,type],i)=>s.users.push({id:i+1,name,user,pass:'123456',type,active:1,phone:'0770'+(1000000+i*7919),gov:G0[i%4],addr:'',salary:type=='مندوب'?500000:0,notes:''}));
 for(let i=0;i<36;i++)s.orders.push({id:i+1,no:String(1000+i),date:td(i%12),client:6+i%3,rep:9+i%3,gov:G0[i%8],area:['الحسين','المنصور','الكرادة','العباسية'][i%4],cust:['علي','زينب','حسن','نور','عمر','ليلى'][i%6],phone:'0771'+(2000000+i*48271%7999999),goods:['ملابس','أدوية','هاتف','عطور'][i%4],qty:1+i%4,total:10000+(i*3250%40000)-(i*3250%40000)%250,xc:i%5?0:1000,xr:0,notes:'',status:[2,2,1,0,2,3,4,1,2][i%9],archived:i>28&&i%9==0||false,deleted:i==35});
 s.cash.push({id:1,date:td(2),type:'وارد',amt:500000,note:'رصيد افتتاحي',by:2},{id:2,date:td(1),type:'صادر',amt:120000,note:'دفعة عميل',by:2});s.exp.push({id:1,date:td(3),amt:75000,note:'وقود'},{id:2,date:td(1),amt:40000,note:'ايجار'});
 s.notes.push({d:td(),t:'مرحبا بك في لوحة التحكم التجريبية'});return s}
-let D;try{D=JSON.parse(localStorage[KEY])}catch(e){}D=D&&D.seq?D:seed();
+let D;try{D=JSON.parse(localStorage[KEY])}catch(e){}D=D&&D.seq?D:seed();fixCo();
 const save=()=>{D.ts=Date.now();try{localStorage[KEY]=JSON.stringify(D)}catch(e){}clearTimeout(window._p);window._p=setTimeout(()=>window.api&&api('state','PUT',D).then(()=>{D.users.forEach(u=>delete u.pass);delete D.reset;try{localStorage[KEY]=JSON.stringify(D)}catch(e){}}).catch(()=>{}),400)},nid=()=>++D.seq,G=()=>Object.keys(D.prov),U=i=>D.users.find(u=>u.id==i)||{name:'—'},byT=t=>D.users.filter(u=>u.type==t).map(u=>[u.id,u.name]);
 const cf=o=>(D.prov[o.gov]||[0,0])[0]+(+o.xc||0),rf=o=>(D.prov[o.gov]||[0,0])[1]+(+o.xr||0),live=o=>!o.deleted&&!o.archived;
 const opts=(a,s)=>a.map(x=>Array.isArray(x)?`<option value="${x[0]}" ${x[0]==s?'selected':''}>${x[1]}</option>`:`<option ${x==s?'selected':''}>${x}</option>`).join('');
@@ -169,7 +170,7 @@ window.rpw=async i=>{const p=prompt('كلمة المرور الجديدة للم
 const ph=p=>{p=String(p||'').replace(/\D/g,'');return p.startsWith('964')?p:p.replace(/^0/,'964')};
 const cw=(p,m='')=>p?`<a class="b s" href="tel:+${ph(p)}" title="اتصال">${ic('phone',15)}</a><a class="b s wa" target="_blank" rel="noopener" href="https://wa.me/${ph(p)}${m?'?text='+encodeURIComponent(m):''}" title="واتساب">${ic('chat',15)}</a>`:'';
 async function pull(){if(!TK()||MODE()=='demo')return;try{const r=await api('state');if(!r.state){api('state','PUT',D);return}
- if((r.state.ts||0)>(D.ts||0)){D=r.state;try{localStorage[KEY]=JSON.stringify(D)}catch(e){}if(!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))render()}
+ if((r.state.ts||0)>(D.ts||0)){D=r.state;fixCo();try{localStorage[KEY]=JSON.stringify(D)}catch(e){}if(!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))render()}
  else if((r.state.ts||0)<(D.ts||0))api('state','PUT',D)}catch(e){}}
 const A=f=>async(...a)=>{try{await f(...a)}catch(e){alert(e.message||e)}};
 R.tg=()=>{setTimeout(tgLoad,50);return box('ربط بوت تلجرام',`<div class="g"><div>الحالة<b id="tgs">…</b></div></div>`+fld('tt','Bot Token (من @BotFather)','p')+fld('tc','Chat ID')+fld('to','الاشعارات','s',[[1,'مفعّلة'],[0,'متوقفة']])+`<button class="b" onclick="tgSave()">${ic('check',18)}حفظ</button><button class="b s" onclick="tgFind()">اكتشاف Chat ID</button><button class="b o" onclick="tgTest()">${ic('send',17)}رسالة تجريبية</button>`)+box('الخطوات','<ol style="margin:0;padding-inline-start:22px;line-height:2.1;font-weight:600"><li>افتح <b>@BotFather</b> في تلجرام ← /newbot ← انسخ التوكن والصقه أعلاه.</li><li>افتح البوت وأرسل له أي رسالة (أو أضفه لمجموعة).</li><li>اضغط <b>اكتشاف Chat ID</b> ثم <b>حفظ</b> ثم <b>رسالة تجريبية</b>.</li><li>ستصلك اشعارات: طلب جديد، تغيير حالة، تعيين مندوب، استيراد.</li></ol>')};

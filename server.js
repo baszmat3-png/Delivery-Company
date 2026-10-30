@@ -13,7 +13,7 @@ const WA_EV={
 const waDef=()=>({on:0,provider:'ultramsg',instance:'',token:'',phoneId:'',url:'',method:'POST',headers:'',bodyTpl:'',base:'',auto:'',trackPhone:1,events:{}});
 let db={state:null,auth:{},tg:{token:'',chat:'',on:1},secret:'',wa:null,waLog:[],waSent:{}};
 try{const f=JSON.parse(fs.readFileSync(DB,'utf8'));Object.assign(db,f);db.tg=Object.assign({token:'',chat:'',on:1},f.tg||{})}catch(e){}
-if(db.state&&db.state.co&&/الأ?فق/.test(db.state.co.name||''))db.state.co.name='شركة التراث للتوصيل السريع';
+if(db.state&&db.state.co&&/ال[أا]فق/.test(db.state.co.name||''))db.state.co.name='شركة التراث للتوصيل السريع';
 db.wa=Object.assign(waDef(),db.wa||{});db.waLog=db.waLog||[];db.waSent=db.waSent||{};
 Object.keys(WA_EV).forEach(k=>db.wa.events[k]=Object.assign({on:WA_EV[k].on,text:WA_EV[k].text},db.wa.events[k]||{}));
 const hash=(p,s=crypto.randomBytes(16).toString('hex'))=>s+':'+crypto.scryptSync(String(p),s,32).toString('hex');
@@ -23,6 +23,7 @@ if(process.env.ADMIN_PASS)db.auth.admin=hash(process.env.ADMIN_PASS);else if(!db
 if(process.env.TELEGRAM_BOT_TOKEN)db.tg.token=process.env.TELEGRAM_BOT_TOKEN;
 if(process.env.TELEGRAM_CHAT_ID)db.tg.chat=process.env.TELEGRAM_CHAT_ID;
 let ft;const flush=()=>{clearTimeout(ft);ft=setTimeout(()=>{try{fs.writeFileSync(DB,JSON.stringify(db))}catch(e){console.error('save',e.message)}},300)};flush();
+const fixN=n=>/الأ?فق/.test(n||'')?'شركة التراث للتوصيل السريع':(n||'');
 const touch=()=>{db.state.ts=Date.now();flush()};
 // ---- تلجرام
 function tg(method,body,token=db.tg.token){return new Promise(res=>{const d=JSON.stringify(body||{});
@@ -91,7 +92,7 @@ function api(req,res,a,qs){return body(req).then(async b=>{const m=req.method;
   const u=users().find(x=>x.user==b.user)||(!users().length&&b.user=='admin'?boot:null);
   if(!u||!+u.active||!chk(b.pass,db.auth[u.user])){t.push(Date.now());return out(res,401,{error:'بيانات الدخول غير صحيحة'})}
   return out(res,200,{token:sign({id:u.id,exp:Date.now()+30*864e5}),me:{id:u.id,name:u.name,user:u.user,type:u.type}})}
- if(a=='track'&&m=='GET'){const ip=req.socket.remoteAddress,t=trk[ip]=(trk[ip]||[]).filter(x=>x>Date.now()-3e5),co=((db.state||{}).co||{}).name||'';
+ if(a=='track'&&m=='GET'){const ip=req.socket.remoteAddress,t=trk[ip]=(trk[ip]||[]).filter(x=>x>Date.now()-3e5),co=fixN(((db.state||{}).co||{}).name);
   const no=String(qs.get('no')||'').trim().slice(0,30),p4=String(qs.get('p')||'').replace(/\D/g,'').slice(-4),need=!!+db.wa.trackPhone;
   if(!no)return out(res,200,{co,phone:need});
   if(t.length>=40)return out(res,429,{error:'محاولات كثيرة، انتظر 5 دقائق'});t.push(Date.now());
@@ -103,7 +104,7 @@ function api(req,res,a,qs){return body(req).then(async b=>{const m=req.method;
  const tk=verify(req.headers['x-token']),me=tk&&find(tk.id);if(!me||!+me.active)return out(res,401,{error:'unauthorized'});
  const staff=STAFF.includes(me.type),mgr=me.type=='مدير';
  if(a=='state'&&m=='GET')return staff?out(res,200,{state:db.state}):out(res,403,{error:'forbidden'});
- if(a=='state'&&m=='PUT'){if(!staff)return out(res,403,{error:'forbidden'});const s=b;if(!s||!s.seq||!Array.isArray(s.orders)||!Array.isArray(s.users))return out(res,400,{error:'bad state'});
+ if(a=='state'&&m=='PUT'){if(!staff)return out(res,403,{error:'forbidden'});const s=b;if(!s||!s.seq||!Array.isArray(s.orders)||!Array.isArray(s.users))return out(res,400,{error:'bad state'});if(s.co&&/الأ?فق/.test(s.co.name||''))s.co.name='شركة التراث للتوصيل السريع';
   const reset=mgr&&s.reset;delete s.reset;const old=db.state;if(old&&!reset){if(!mgr){s.users=old.users;s.co=old.co;s.prov=old.prov}
    const ids=new Set(s.orders.map(o=>o.id));old.orders.forEach(o=>{if(!ids.has(o.id))s.orders.push(o)});s.seq=Math.max(s.seq,old.seq||0)}
   s.users.forEach(u=>{if(u.pass){if(!db.auth[u.user])db.auth[u.user]=hash(u.pass);delete u.pass}});
@@ -117,7 +118,7 @@ function api(req,res,a,qs){return body(req).then(async b=>{const m=req.method;
   touch();return out(res,200,{ok:true})}
  if(a=='portal'&&m=='GET'){const S=db.state||{orders:[],prov:{},co:{}},cl=me.type=='عميل',P=o=>S.prov[o.gov]||[0,0];
   const ord=S.orders.filter(o=>!o.deleted&&(cl?o.client==me.id:o.rep==me.id)).slice(-300).reverse().map(o=>({id:o.id,no:o.no,date:o.date,cust:o.cust,phone:o.phone,gov:o.gov,area:o.area,goods:o.goods,qty:o.qty,total:o.total,notes:o.notes,status:o.status,rep:(u=>u?{name:u.name,phone:u.phone||''}:null)(users().find(u=>u.id==o.rep)),hist:(o.hist||[]).map(h=>({s:h.s,t:h.t})),fee:(cl?P(o)[0]+(+o.xc||0):P(o)[1]+(+o.xr||0))}));
-  return out(res,200,{me:{id:me.id,name:me.name,type:me.type,phone:me.phone},co:(S.co||{}).name||'',govs:Object.keys(S.prov||{}),orders:ord})}
+  return out(res,200,{me:{id:me.id,name:me.name,type:me.type,phone:me.phone},co:fixN((S.co||{}).name),govs:Object.keys(S.prov||{}),orders:ord})}
  if(a=='order'&&m=='POST'){if(me.type!='عميل'||!db.state)return out(res,403,{error:'غير مسموح'});const S=db.state;
   const o={id:Date.now(),no:esc(b.no,30).trim(),date:td(),client:me.id,rep:0,gov:S.prov[b.gov]?b.gov:(S.co||{}).gov,area:esc(b.area),cust:esc(b.cust).trim(),phone:esc(b.phone,20),goods:esc(b.goods),qty:Math.max(1,+b.qty||1),total:+b.total||0,xc:0,xr:0,notes:esc(b.notes,300),status:0,archived:false,deleted:false};
   if(!o.no||!o.cust||o.total<=0)return out(res,400,{error:'ادخل رقم الوصل واسم الزبون والمبلغ'});
